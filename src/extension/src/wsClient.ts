@@ -1,12 +1,20 @@
 import { WebSocketServer, WebSocket, RawData } from 'ws';
 import { EventEmitter } from 'events';
 
+export interface TreeNode {
+  className: string;
+  children?: TreeNode[] | Record<string, never>;
+  name?: string;
+}
+
 export interface WSMessage {
-  type: 'complete_result' | 'script_search_result' | 'decompile_result' | 'error';
+  type: 'complete_result' | 'script_search_result' | 'decompile_result' | 'class_result' | 'tree_dump_result' | 'error';
   requestId?: string;
   items?: CompletionResultItem[];
   scriptItems?: ScriptSearchResultItem[];
   source?: string;
+  className?: string;
+  tree?: TreeNode;
   message?: string;
 }
 
@@ -47,6 +55,16 @@ export class RobloxWSClient extends EventEmitter {
   }>();
   private pendingDecompile = new Map<string, {
     resolve: (source: string) => void;
+    reject: (err: Error) => void;
+    timeout: NodeJS.Timeout;
+  }>();
+  private pendingClassResolve = new Map<string, {
+    resolve: (className: string) => void;
+    reject: (err: Error) => void;
+    timeout: NodeJS.Timeout;
+  }>();
+  private pendingTreeDump = new Map<string, {
+    resolve: (tree: TreeNode) => void;
     reject: (err: Error) => void;
     timeout: NodeJS.Timeout;
   }>();
@@ -157,6 +175,26 @@ export class RobloxWSClient extends EventEmitter {
           }
         }
         break;
+      case 'class_result':
+        if (msg.requestId) {
+          const pending = this.pendingClassResolve.get(msg.requestId);
+          if (pending) {
+            clearTimeout(pending.timeout);
+            this.pendingClassResolve.delete(msg.requestId);
+            pending.resolve(msg.className ?? '');
+          }
+        }
+        break;
+      case 'tree_dump_result':
+        if (msg.requestId) {
+          const pending = this.pendingTreeDump.get(msg.requestId);
+          if (pending) {
+            clearTimeout(pending.timeout);
+            this.pendingTreeDump.delete(msg.requestId);
+            pending.resolve(msg.tree ?? { className: 'DataModel' });
+          }
+        }
+        break;
       case 'error':
         if (msg.requestId) {
           const pending = this.pendingCompletions.get(msg.requestId);
@@ -180,6 +218,22 @@ export class RobloxWSClient extends EventEmitter {
             clearTimeout(pendingDecompile.timeout);
             this.pendingDecompile.delete(msg.requestId);
             pendingDecompile.reject(new Error(msg.message ?? 'Script decompile request failed'));
+            return;
+          }
+
+          const pendingClass = this.pendingClassResolve.get(msg.requestId);
+          if (pendingClass) {
+            clearTimeout(pendingClass.timeout);
+            this.pendingClassResolve.delete(msg.requestId);
+            pendingClass.reject(new Error(msg.message ?? 'Class resolve request failed'));
+            return;
+          }
+
+          const pendingTree = this.pendingTreeDump.get(msg.requestId);
+          if (pendingTree) {
+            clearTimeout(pendingTree.timeout);
+            this.pendingTreeDump.delete(msg.requestId);
+            pendingTree.reject(new Error(msg.message ?? 'Tree dump request failed'));
             return;
           }
         }
@@ -206,6 +260,18 @@ export class RobloxWSClient extends EventEmitter {
       pending.reject(err);
       this.pendingDecompile.delete(requestId);
     }
+
+    for (const [requestId, pending] of this.pendingClassResolve.entries()) {
+      clearTimeout(pending.timeout);
+      pending.reject(err);
+      this.pendingClassResolve.delete(requestId);
+    }
+
+    for (const [requestId, pending] of this.pendingTreeDump.entries()) {
+      clearTimeout(pending.timeout);
+      pending.reject(err);
+      this.pendingTreeDump.delete(requestId);
+    }
   }
 
   async requestCompletions(query: CompletionRequest): Promise<CompletionResultItem[]> {
@@ -228,6 +294,46 @@ export class RobloxWSClient extends EventEmitter {
         serviceName: query.serviceName ?? '',
         path: query.path,
         prefix: query.prefix
+      });
+    });
+  }
+
+  async requestTreeDump(): Promise<TreeNode> {
+    if (!this.activeSocket || !this._connected || this.activeSocket.readyState !== WebSocket.OPEN) {
+      throw new Error('Not connected');
+    }
+
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    return new Promise<TreeNode>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingTreeDump.delete(requestId);
+        reject(new Error('Tree dump timed out'));
+      }, 15000);
+
+      this.pendingTreeDump.set(requestId, { resolve, reject, timeout });
+      this.send({ type: 'tree_dump', requestId });
+    });
+  }
+
+  async requestResolveClass(scope: string, serviceName: string, path: string): Promise<string> {
+    if (!this.activeSocket || !this._connected || this.activeSocket.readyState !== WebSocket.OPEN) {
+      return '';
+    }
+
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    return new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingClassResolve.delete(requestId);
+        reject(new Error('Class resolve timed out'));
+      }, 1200);
+
+      this.pendingClassResolve.set(requestId, { resolve, reject, timeout });
+      this.send({
+        type: 'resolve_class',
+        requestId,
+        scope,
+        serviceName,
+        path
       });
     });
   }

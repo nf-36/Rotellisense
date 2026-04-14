@@ -12,6 +12,71 @@ local BlacklistedPaths = {
     game:GetService("CoreGui")
 }
 
+-- Services excluded from the type tree dump entirely
+local TreeDumpSkipServices = {
+    CoreGui = true, CorePackages = true, RobloxPluginGuiService = true,
+    PluginGuiService = true, Selection = true, RobloxGoogleAnalyticsConfiguration = true
+}
+-- Services whose children are not traversed (included as a typed node, children skipped)
+local TreeDumpShallowServices = {
+    Players = true, HttpService = true, TeleportService = true
+}
+local TreeDumpMaxDepth = 10
+local TreeDumpMaxChildrenPerNode = 200
+
+local function BuildTreeNode(Instance, Depth)
+    if Depth > TreeDumpMaxDepth then
+        return { className = Instance.ClassName, children = {} }
+    end
+
+    local Node = { className = Instance.ClassName, children = {} }
+
+    local Ok, Children = pcall(function() return Instance:GetChildren() end)
+    if not Ok then return Node end
+
+    local Count = 0
+    for _, Child in ipairs(Children) do
+        if Count >= TreeDumpMaxChildrenPerNode then break end
+        local ChildNode = BuildTreeNode(Child, Depth + 1)
+        table.insert(Node.children, {
+            name = Child.Name,
+            className = ChildNode.className,
+            children = ChildNode.children
+        })
+        Count += 1
+    end
+
+    return Node
+end
+
+local function BuildGameTree()
+    local Root = { className = "DataModel", children = {} }
+
+    local Ok, Services = pcall(function() return game:GetChildren() end)
+    if not Ok then return Root end
+
+    for _, Service in ipairs(Services) do
+        if TreeDumpSkipServices[Service.Name] then continue end
+
+        if TreeDumpShallowServices[Service.Name] then
+            table.insert(Root.children, {
+                name = Service.Name,
+                className = Service.ClassName,
+                children = {}
+            })
+        else
+            local Node = BuildTreeNode(Service, 1)
+            table.insert(Root.children, {
+                name = Service.Name,
+                className = Node.className,
+                children = Node.children
+            })
+        end
+    end
+
+    return Root
+end
+
 local ScriptIndexById = {}
 local ScriptRecords = {}
 local NextScriptId = 0
@@ -490,6 +555,39 @@ local function Connect()
                 requestId = RequestId,
                 items = Items
             })
+        elseif MessageType == "tree_dump" then
+            local RequestId = ExtractStringField(Raw, "requestId") or ""
+            local Tree = BuildGameTree()
+            Send({
+                type = "tree_dump_result",
+                requestId = RequestId,
+                tree = Tree
+            })
+
+        elseif MessageType == "resolve_class" then
+            local RequestId = ExtractStringField(Raw, "requestId") or ""
+            local Scope = ExtractStringField(Raw, "scope") or ""
+            local ServiceName = ExtractStringField(Raw, "serviceName") or ""
+            local Path = ExtractStringField(Raw, "path") or ""
+
+            local PathParts = SplitDotPath(Path)
+            local Root, Remaining = ResolveRoot(Scope, ServiceName, PathParts)
+            local Target = Root and TraverseToTarget(Root, Remaining)
+
+            if Target then
+                Send({
+                    type = "class_result",
+                    requestId = RequestId,
+                    className = Target.ClassName
+                })
+            else
+                Send({
+                    type = "error",
+                    requestId = RequestId,
+                    message = "Instance not found"
+                })
+            end
+
         elseif MessageType == "script_search" then
             local RequestId = ExtractStringField(Raw, "requestId") or ""
             local Query = ExtractStringField(Raw, "query") or ""
