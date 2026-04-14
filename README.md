@@ -54,7 +54,7 @@ Or install the built `.vsix` package.
 
 ### 3) Run the Roblox webhook script
 
-Load and execute [luaclient/RobloxWebhook.lua](luaclient/RobloxWebhook.lua) in your executor.
+Load and execute [luaclient/RobloxWebhook.lua](src/luaclient/RobloxWebhook.lua) in your executor.
 
 Default URL in the script:
 
