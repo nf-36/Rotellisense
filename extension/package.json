@@ -1,0 +1,105 @@
+{
+  "name": "rotellisense",
+  "displayName": "Rotellisense",
+  "description": "On-demand Roblox IntelliSense with script decompile tools",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:lua",
+    "onLanguage:luau"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "rotellisense.reconnect",
+        "title": "Rotellisense: Reconnect WebSocket"
+      },
+      {
+        "command": "rotellisense.searchScripts",
+        "title": "Rotellisense: Search Scripts",
+        "icon": "$(search)"
+      },
+      {
+        "command": "rotellisense.refreshScripts",
+        "title": "Rotellisense: Refresh Script Results",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "rotellisense.decompileScript",
+        "title": "Rotellisense: Decompile Script",
+        "icon": "$(file-code)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "rotellisense",
+          "title": "Rotellisense",
+          "icon": "media/rotellisense.svg"
+        }
+      ]
+    },
+    "views": {
+      "rotellisense": [
+        {
+          "id": "rotellisense.scriptsView",
+          "name": "Scripts",
+          "icon": "media/rotellisense.svg"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "rotellisense.searchScripts",
+          "when": "view == rotellisense.scriptsView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "rotellisense.refreshScripts",
+          "when": "view == rotellisense.scriptsView",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "rotellisense.decompileScript",
+          "when": "view == rotellisense.scriptsView && viewItem == rotellisense.scriptItem",
+          "group": "inline@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Rotellisense",
+      "properties": {
+        "rotellisense.wsPort": {
+          "type": "number",
+          "default": 9000,
+          "description": "WebSocket relay port"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\"",
+    "compile": "npm run clean && tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vsix": "npm run compile && npx @vscode/vsce package --allow-missing-repository"
+  },
+  "dependencies": {
+    "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "@types/ws": "^8.18.1",
+    "@vscode/vsce": "^3.7.1",
+    "typescript": "^5.0.0"
+  }
+}
