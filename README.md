@@ -1,7 +1,7 @@
 # Rotellisense
-
-
 Rotellisense is a VS Code extension plus a Roblox executor-side webhook script that provides on-demand Roblox IntelliSense, script search, and script decompile workflows from inside VS Code.
+
+<img width="768" height="322" alt="image" src="https://github.com/user-attachments/assets/a3f01490-4444-4d73-af99-a68c1ec968aa" />
 
 The project is split into:
 
