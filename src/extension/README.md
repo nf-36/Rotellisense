@@ -11,7 +11,7 @@ VS Code extension for on-demand Roblox IntelliSense, script search, and script d
 
 ## Companion Script
 
-This extension expects the executor-side webhook script in [luaclient/RobloxWebhook.lua](https://github.com/nf-36/intellisense/blob/main/luaclient/RobloxWebhook.lua) to be running.
+This extension expects the executor-side webhook script in [luaclient/RobloxWebhook.lua](../luaclient/RobloxWebhook.lua) to be running.
 
 Default port is `9000` on localhost.
 
