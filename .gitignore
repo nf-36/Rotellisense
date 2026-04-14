@@ -1,6 +1,8 @@
 .vscode/
+/src/lua/test.luau
 **/node_modules/
 **/out/
 *.vsix
 # Rotellisense live type project (auto-generated)
 rotellisense-live.project.json
+.github/agents/Depso.agent.md

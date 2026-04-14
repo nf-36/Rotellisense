@@ -56,8 +56,10 @@ export class RobloxCompletionProvider implements vscode.CompletionItemProvider {
       return Promise.resolve(undefined);
     }
 
-    // In hybrid+LSP mode suppress root-level completions to avoid duplicates
-    if (this.options.isHybridWithLsp() && parsed.query.path === '') {
+    // In hybrid+LSP mode suppress root-level game.X completions to avoid duplicates —
+    // robloxlsp already knows top-level services from its API dump. Only applies to the
+    // raw `game.` scope; GetService/workspace scopes always need live children.
+    if (this.options.isHybridWithLsp() && parsed.query.scope === 'game' && parsed.query.path === '') {
       return Promise.resolve(undefined);
     }
 

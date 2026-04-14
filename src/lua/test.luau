@@ -1,1 +1,0 @@
-game.ReplicatedStorage.Remotes.AdminUfoEvent:FireS
