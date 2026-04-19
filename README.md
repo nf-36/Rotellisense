@@ -1,123 +1,66 @@
 # Rotellisense
-Rotellisense is a VS Code extension plus a Roblox executor-side webhook script that provides on-demand Roblox IntelliSense, script search, and script decompile workflows from inside VS Code.
+
+Rotellisense connects VS Code to your Roblox game in real time, giving you live autocomplete, script search, and script decompile. all without leaving your editor.
 
 <img width="768" height="322" alt="image" src="https://github.com/user-attachments/assets/a3f01490-4444-4d73-af99-a68c1ec968aa" />
 
-The project is split into:
-
-- `extension/`: TypeScript VS Code extension that runs a local WebSocket relay and UI.
-- `luaclient/`: Roblox-side Lua script (`RobloxWebhook.lua`) that connects to the relay, answers completion/search requests, and returns script source when possible.
+---
 
 ## What It Does
 
-- Autocomplete for common Roblox object traversal patterns (`game`, `workspace`, `game:GetService(...)`)
-- Script search UI in a dedicated VS Code activity bar view
-- One-click script decompile/open flow from search results
-- Local-only connection (`127.0.0.1` / `localhost`) between VS Code and the webhook
+- **Live autocomplete**. type `game:GetService("ReplicatedStorage").` and see your actual folders, RemoteEvents, and scripts as suggestions
+- **Type-aware completions**. knows that a `RemoteEvent` has `:FireServer()`, `:FireClient()`, etc. without you needing to annotate anything
+- **Script search**. search every script in your game from a sidebar panel
+- **Script decompile**. click any search result to open its source in an editor tab
 
-## Architecture
-
-1. VS Code extension starts a WebSocket server on `127.0.0.1:<port>` (default `9000`).
-2. `RobloxWebhook.lua` connects to `ws://localhost:<port>` from your executor.
-3. Extension sends request types: `complete`, `script_search`, `script_decompile`.
-4. Lua client returns JSON response payloads that the extension renders in completion lists, tree view results, and virtual decompile documents.
+---
 
 ## Requirements
 
-- Windows (project currently tested on Windows workflows)
-- Node.js 18+ (recommended)
 - VS Code 1.80+
-- A Roblox executor environment that supports `WebSocket.connect`
-- `decompile` (optional but recommended)
+- A Roblox executor that supports `WebSocket.connect`
 
-## Quick Start
+---
 
-### 1) Build the VS Code extension
+## Setup
 
-```powershell
-cd extension
-npm install
-npm run compile
-```
+### 1) Install the extension
 
-Optional package step:
+Download the latest `.vsix` from [Releases](https://github.com/nf-36/rotellisense/releases) and install it:
 
-```powershell
-npm run vsix
-```
+> VS Code → Extensions → `···` menu → Install from VSIX
 
-### 2) Run the extension in VS Code
+### 2) Run the webhook script in Roblox
 
-Open the `extension/` folder in VS Code, then run Extension Development Host (`F5`) from source.
+Place [RobloxWebhook.lua](src/lua/RobloxWebhook.lua) in your autoexec folder. You'll see the VS Code status bar change to **Rotellisense: Live** when you join a game.
 
-Or install the built `.vsix` package.
+### 3) Start coding
 
-### 3) Run the Roblox webhook script
+Open any `.lua` or `.luau` file and type `.` after a Roblox path. suggestions will pull directly from your live game.
 
-Load and execute [luaclient/RobloxWebhook.lua](src/luaclient/RobloxWebhook.lua) in your executor.
+---
 
-Default URL in the script:
+## Settings
 
-```lua
-local WsUrl = "ws://localhost:9000"
-```
+| Setting | Default | Description |
+|---|---|---|
+| `rotellisense.wsPort` | `9000` | Port the extension listens on (must match `WsUrl` in the Lua script) |
+| `rotellisense.completionMode` | `hybrid` | `hybrid` merges live data with Roblox LSP · `webhook` uses only live data · `off` disables completions |
 
-If you changed the VS Code port setting, update `WsUrl` to match.
+---
 
-### 4) Use extension features
+## Tips
 
-- Confirm status bar shows connected state.
-- Open a `.lua` or `.luau` file and trigger completion with `.`.
-- Open the Rotellisense activity view and run `Search Scripts`.
-- Click a search result to decompile and view source in an editor tab.
+- The status bar shows connection state at all times. If it says **Offline**, re-run the webhook script or restart Rotellisense
+- If you changed the port in VS Code settings, update `WsUrl` in the Webhook script to match
 
-## Extension Settings
-
-- `rotellisense.wsPort` (number, default `9000`): WebSocket relay port used by the extension.
-
-## Commands
-
-- `Rotellisense: Reconnect WebSocket`
-- `Rotellisense: Search Scripts`
-- `Rotellisense: Refresh Script Results`
-- `Rotellisense: Decompile Script`
-
-## Development
-
-### Workspace layout
-
-```text
-extension/
-  src/
-    extension.ts
-    wsClient.ts
-    completionProvider.ts
-    scriptExplorerProvider.ts
-luaclient/
-  RobloxWebhook.lua
-```
-
-### Build commands
-
-From `extension/`:
-
-- `npm run clean`
-- `npm run compile`
-- `npm run watch`
-- `npm run vsix`
-
-## Troubleshooting
-
-- Not connected: confirm the Lua webhook is running and `WsUrl` uses the same port as `rotellisense.wsPort`.
-- Not connected: confirm another process is not already bound to port `9000` (or your configured port).
-- No completions: parser currently targets `game`, `workspace`, and `game:GetService(...)` traversal patterns.
-- Decompile returns empty: executor may not support `decompile` or may block source access for that instance.
-
+---
 
 ## License
-MIT License. See [LICENSE](LICENSE).
+
+MIT - see [LICENSE](LICENSE)
 
 ## Statistics
 
 [![Release Downloads](https://img.shields.io/github/downloads/nf-36/intellisense/total?label=Release%20Downloads)](https://github.com/nf-36/intellisense/releases)
-<img src="https://visitor-badge.laobi.icu/badge?page_id=nf-36.intellisense&amp;left_text=Views&amp;left_color=111827&amp;right_color=374151" alt="Visitors">
+<img src="https://visitor-badge.laobi.icu/badge?page_id=nf-36.intellisense&left_text=Views&left_color=111827&right_color=374151" alt="Visitors">
