@@ -8,7 +8,7 @@ export interface TreeNode {
 }
 
 export interface WSMessage {
-  type: 'complete_result' | 'script_search_result' | 'decompile_result' | 'class_result' | 'tree_dump_result' | 'error';
+  type: 'complete_result' | 'script_search_result' | 'decompile_result' | 'class_result' | 'tree_dump_result' | 'execute_result' | 'error';
   requestId?: string;
   items?: CompletionResultItem[];
   scriptItems?: ScriptSearchResultItem[];
@@ -16,6 +16,8 @@ export interface WSMessage {
   className?: string;
   tree?: TreeNode;
   message?: string;
+  success?: boolean;
+  output?: string;
 }
 
 export interface CompletionRequest {
@@ -65,6 +67,11 @@ export class RobloxWSClient extends EventEmitter {
   }>();
   private pendingTreeDump = new Map<string, {
     resolve: (tree: TreeNode) => void;
+    reject: (err: Error) => void;
+    timeout: NodeJS.Timeout;
+  }>();
+  private pendingExecute = new Map<string, {
+    resolve: (output: string) => void;
     reject: (err: Error) => void;
     timeout: NodeJS.Timeout;
   }>();
@@ -195,6 +202,20 @@ export class RobloxWSClient extends EventEmitter {
           }
         }
         break;
+      case 'execute_result':
+        if (msg.requestId) {
+          const pending = this.pendingExecute.get(msg.requestId);
+          if (pending) {
+            clearTimeout(pending.timeout);
+            this.pendingExecute.delete(msg.requestId);
+            if (msg.success === false) {
+              pending.reject(new Error(msg.message ?? 'Execution failed'));
+            } else {
+              pending.resolve(msg.output ?? '');
+            }
+          }
+        }
+        break;
       case 'error':
         if (msg.requestId) {
           const pending = this.pendingCompletions.get(msg.requestId);
@@ -271,6 +292,12 @@ export class RobloxWSClient extends EventEmitter {
       clearTimeout(pending.timeout);
       pending.reject(err);
       this.pendingTreeDump.delete(requestId);
+    }
+
+    for (const [requestId, pending] of this.pendingExecute.entries()) {
+      clearTimeout(pending.timeout);
+      pending.reject(err);
+      this.pendingExecute.delete(requestId);
     }
   }
 
@@ -378,6 +405,23 @@ export class RobloxWSClient extends EventEmitter {
         requestId,
         scriptId
       });
+    });
+  }
+
+  async executeScript(source: string): Promise<string> {
+    if (!this.activeSocket || !this._connected || this.activeSocket.readyState !== WebSocket.OPEN) {
+      throw new Error('Roblox webhook is not connected');
+    }
+
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    return new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingExecute.delete(requestId);
+        reject(new Error('Script execution timed out'));
+      }, 15000);
+
+      this.pendingExecute.set(requestId, { resolve, reject, timeout });
+      this.send({ type: 'execute_script', requestId, source });
     });
   }
 

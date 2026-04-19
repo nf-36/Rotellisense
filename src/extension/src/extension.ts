@@ -78,6 +78,31 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('rotellisense.refreshScripts', async () => {
       await scriptExplorer.refresh();
     }),
+    vscode.commands.registerCommand('rotellisense.executeScript', async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        vscode.window.showWarningMessage('Rotellisense: No active editor.');
+        return;
+      }
+
+      if (!client.connected) {
+        vscode.window.showWarningMessage('Rotellisense: Connect the webhook before executing scripts.');
+        return;
+      }
+
+      const source = editor.document.getText();
+      try {
+        vscode.window.setStatusBarMessage('$(run) Rotellisense: Executing script...', 3000);
+        const output = await client.executeScript(source);
+        if (output) {
+          vscode.window.showInformationMessage(`Rotellisense: ${output}`);
+        } else {
+          vscode.window.setStatusBarMessage('$(check) Rotellisense: Script executed.', 3000);
+        }
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Rotellisense: Execution failed: ${err?.message ?? 'unknown error'}`);
+      }
+    }),
     vscode.commands.registerCommand('rotellisense.decompileScript', async (script: { id: string; name: string; path: string }) => {
       if (!script?.id) {
         return;

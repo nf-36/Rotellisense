@@ -2,7 +2,7 @@
   "name": "rotellisense",
   "displayName": "Rotellisense",
   "description": "On-demand Roblox IntelliSense with script decompile tools",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "repository": {
     "type": "git",
     "url": "https://github.com/nf-36/rotellisense.git"
@@ -43,6 +43,11 @@
         "command": "rotellisense.decompileScript",
         "title": "Rotellisense: Decompile Script",
         "icon": "$(file-code)"
+      },
+      {
+        "command": "rotellisense.executeScript",
+        "title": "Rotellisense: Execute Script in Roblox",
+        "icon": "$(run)"
       }
     ],
     "viewsContainers": {
@@ -74,6 +79,20 @@
           "command": "rotellisense.refreshScripts",
           "when": "view == rotellisense.scriptsView",
           "group": "navigation@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "rotellisense.executeScript",
+          "when": "editorLangId == lua || editorLangId == luau",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "rotellisense.executeScript",
+          "when": "editorLangId == lua || editorLangId == luau",
+          "group": "rotellisense@1"
         }
       ],
       "view/item/context": [

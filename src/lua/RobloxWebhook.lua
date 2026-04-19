@@ -398,9 +398,74 @@ local function JsonEncode(Value)
     return "null"
 end
 
+local function JsonDecodeString(Raw, StartPos)
+    -- StartPos should point to the opening quote character
+    if Raw:sub(StartPos, StartPos) ~= '"' then
+        return nil, StartPos
+    end
+
+    local Result = {}
+    local Index = StartPos + 1
+    local Length = #Raw
+
+    while Index <= Length do
+        local Char = Raw:sub(Index, Index)
+        if Char == '"' then
+            return table.concat(Result), Index + 1
+        elseif Char == '\\' then
+            Index += 1
+            local Escaped = Raw:sub(Index, Index)
+            if Escaped == '"' then
+                table.insert(Result, '"')
+            elseif Escaped == '\\' then
+                table.insert(Result, '\\')
+            elseif Escaped == '/' then
+                table.insert(Result, '/')
+            elseif Escaped == 'n' then
+                table.insert(Result, '\n')
+            elseif Escaped == 'r' then
+                table.insert(Result, '\r')
+            elseif Escaped == 't' then
+                table.insert(Result, '\t')
+            elseif Escaped == 'b' then
+                table.insert(Result, '\b')
+            elseif Escaped == 'f' then
+                table.insert(Result, '\f')
+            elseif Escaped == 'u' then
+                -- \uXXXX — skip 4 hex digits, approximate as '?'
+                table.insert(Result, '?')
+                Index += 4
+            else
+                table.insert(Result, Escaped)
+            end
+        else
+            table.insert(Result, Char)
+        end
+        Index += 1
+    end
+
+    return table.concat(Result), Index
+end
+
 local function ExtractStringField(Raw, Key)
-    local Pattern = '"' .. Key .. '"%s*:%s*"([^"]*)"'
-    return Raw:match(Pattern)
+    local KeyPattern = '"' .. Key .. '"%s*:%s*'
+    local KeyStart, KeyEnd = Raw:find(KeyPattern)
+    if not KeyStart then
+        return nil
+    end
+
+    local ValueStart = KeyEnd + 1
+    -- Skip whitespace
+    while ValueStart <= #Raw and Raw:sub(ValueStart, ValueStart):match('%s') do
+        ValueStart += 1
+    end
+
+    if Raw:sub(ValueStart, ValueStart) ~= '"' then
+        return nil
+    end
+
+    local Value = JsonDecodeString(Raw, ValueStart)
+    return Value
 end
 
 local function ExtractType(Raw)
@@ -617,6 +682,38 @@ local function Connect()
                     message = ErrorMessage or "Decompile failed"
                 })
             end
+        elseif MessageType == "execute_script" then
+            local RequestId = ExtractStringField(Raw, "requestId") or ""
+            local Source = ExtractStringField(Raw, "source") or ""
+
+            local Fn, LoadError = loadstring(Source)
+            if not Fn then
+                Send({
+                    type = "execute_result",
+                    requestId = RequestId,
+                    success = false,
+                    message = LoadError or "Failed to load script"
+                })
+                return
+            end
+
+            local Ok, RunError = pcall(Fn)
+            if not Ok then
+                Send({
+                    type = "execute_result",
+                    requestId = RequestId,
+                    success = false,
+                    message = tostring(RunError)
+                })
+            else
+                Send({
+                    type = "execute_result",
+                    requestId = RequestId,
+                    success = true,
+                    output = ""
+                })
+            end
+
         elseif MessageType == "index_scripts" then
             BuildScriptIndex()
             Send({
